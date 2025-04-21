@@ -4,12 +4,10 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
 
-# Define the SQLite database file path
 DB_FILE = './db/ims.db'
 engine = create_engine(f'sqlite:///{DB_FILE}')
 Base = declarative_base()
 
-# Define the Measurement model
 class Measurement(Base):
     __tablename__ = 'measurements'
     
@@ -34,30 +32,23 @@ class Measurement(Base):
     pos_spectrum = Column(BLOB)
     neg_spectrum = Column(BLOB)
 
-# Create the table if it doesn't exist
 Base.metadata.create_all(engine)
 
-# Set up the session
 Session = sessionmaker(bind=engine)
 session = Session()
 
-# Function to select particular columns from the database
 def select_columns_from_db(columns):
-    # Query the database for the specified columns
     query = session.query(*[getattr(Measurement, col) for col in columns])
     results = query.all()
     
-    # Convert the results to a DataFrame
     df = pd.DataFrame(results, columns=columns)
     return df
 
 def load_csv_and_insert(csv_file):
-    # Read CSV with header row
     df = pd.read_csv(csv_file, header=0)
     print("DataFrame head:")
     print(df.head())
     
-    # Iterate over each row and create a Measurement record
     for index, row in df.iterrows():
         try:
             measurement = Measurement(
@@ -88,4 +79,3 @@ def load_csv_and_insert(csv_file):
     session.commit()
     print(f"Inserted {len(df)} records into the database.")
 
-    
