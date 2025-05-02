@@ -1,55 +1,50 @@
 from modules import sqlite_helper
+from modules.ims import process_spectrum, plot_spectrum, calculate_k0_value  # Import IMS functions
 import numpy as np
-from scipy.signal import savgol_filter, find_peaks
-import matplotlib.pyplot as plt  # Add this import
-
-def process_spectrum(spectrum):
-    spectrum = np.fromstring(spectrum[2:-1], sep=', ')  # Convert byte string to numpy array
-    
-    smoothed_spectrum = savgol_filter(spectrum, window_length=11, polyorder=3, deriv=2)
-    
-    peaks, properties = find_peaks(smoothed_spectrum, height=0)
-    
-    top_peaks = sorted(zip(peaks, properties['peak_heights']), key=lambda x: x[1], reverse=True)[:10]
-    
-    return [(int(idx), float(height)) for idx, height in top_peaks]
-
-def plot_spectrum(spectrum, peaks):
-    """
-    Plots the spectrum and highlights the detected peaks.
-    """
-    plt.figure(figsize=(10, 6))
-    plt.plot(spectrum, label="Spectrum")
-    plt.scatter(peaks, [spectrum[p] for p in peaks], color='red', label="Peaks")
-    plt.title("Spectrum with Detected Peaks")
-    plt.xlabel("Index")
-    plt.ylabel("Intensity")
-    plt.legend()
-    plt.show()
 
 def main():
     csv_file = r"./data/test.csv"
     # # sqlite_helper.load_csv_and_insert(csv_file)
 
-    df = sqlite_helper.select_columns_from_db(["measurement_time", "pos_spectrum"])
+    df = sqlite_helper.select_columns_from_db(["measurement_time", "pos_spectrum", "neg_spectrum", "temperature_drift_tube", "pressure", "pos_voltage", "neg_voltage", "tube_length"])
+
+    count = 0
     
     for index, row in df.iterrows():
         measurement_time = row["measurement_time"]
         pos_spectrum = row["pos_spectrum"]
+        neg_spectrum = row["neg_spectrum"]
+        temperature = row["temperature_drift_tube"]
+        pressure = row["pressure"]
+        pos_voltage = row["pos_voltage"]
+        neg_voltage = row["neg_voltage"]
+        drift_tube_length = row["tube_length"]
+        resolution = 32.392  
 
-        spectrum = np.fromstring(pos_spectrum[2:-1], sep=', ')
+        pos_spectrum_array = np.fromstring(pos_spectrum[2:-1], sep=', ')
+        neg_spectrum_array = np.fromstring(neg_spectrum[2:-1], sep=', ')
         
-        if np.all(spectrum == 0):
+        if np.all(pos_spectrum_array == 0) and np.all(neg_spectrum_array == 0):
             print(f"Skipping spectrum at Measurement Time: {measurement_time} (contains only zeros)")
             continue
         
-        top_peaks = process_spectrum(pos_spectrum)
-        peak_indices = [idx for idx, _ in top_peaks]
+        if not np.all(pos_spectrum_array == 0):
+            pos_top_peaks = process_spectrum(pos_spectrum)
+            pos_peak_indices = [idx for idx, _ in pos_top_peaks]
+            pos_k0_values = calculate_k0_value(pos_top_peaks, temperature, pressure, pos_voltage, drift_tube_length, resolution)
+            print(f"Measurement Time: {measurement_time} (Positive Spectrum)")
+            print(f"Top 10 Peaks: {pos_top_peaks}")
+            print(f"K0 Values: {pos_k0_values}")
         
-        plot_spectrum(spectrum, peak_indices)
-        
-        print(f"Measurement Time: {measurement_time}")
-        print(f"Top 10 Peaks: {top_peaks}")
+        if not np.all(neg_spectrum_array == 0):
+            neg_top_peaks = process_spectrum(neg_spectrum)
+            neg_peak_indices = [idx for idx, _ in neg_top_peaks]
+            neg_k0_values = calculate_k0_value(neg_top_peaks, temperature, pressure, neg_voltage, drift_tube_length, resolution)
+            print(f"Measurement Time: {measurement_time} (Negative Spectrum)")
+            print(f"Top 10 Peaks: {neg_top_peaks}")
+            print(f"K0 Values: {neg_k0_values}")
+
+    # print(sqlite_helper.select_columns_from_db(["measurement_time", "dilution", "pressure"]))
 
 if __name__ == "__main__":
     main()
