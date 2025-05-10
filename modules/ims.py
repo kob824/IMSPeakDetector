@@ -13,19 +13,6 @@ def process_spectrum(spectrum):
     
     return [(int(idx), float(height)) for idx, height in top_peaks]
 
-def plot_spectrum(spectrum, peaks):
-    """
-    Plots the spectrum and highlights the detected peaks.
-    """
-    plt.figure(figsize=(10, 6))
-    plt.plot(spectrum, label="Spectrum")
-    plt.scatter(peaks, [spectrum[p] for p in peaks], color='red', label="Peaks")
-    plt.title("Spectrum with Detected Peaks")
-    plt.xlabel("Index")
-    plt.ylabel("Intensity")
-    plt.legend()
-    plt.show()
-
 def calculate_k0_value(peaks, temperature, pressure, voltage, drift_tube_length, resolution):
     """
     Calculate the k0 value based on the peaks, temperature, pressure, drift tube length, and resolution.

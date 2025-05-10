@@ -1,5 +1,5 @@
 import pandas as pd
-from sqlalchemy import create_engine, Column, Integer, String, Float, BLOB
+from sqlalchemy import create_engine, Column, Integer, String, Float, BLOB, Table, MetaData
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
@@ -37,11 +37,27 @@ Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
 
-def select_columns_from_db(columns):
-    query = session.query(*[getattr(Measurement, col) for col in columns])
-    results = query.all()
+def select_columns_from_db(columns, table='measurements'):
+    """
+    Select columns from the specified table.
     
-    df = pd.DataFrame(results, columns=columns)
+    Parameters:
+    - columns: List of column names
+    - table: Table name (default: 'measurements')
+    
+    Returns:
+    - DataFrame with selected data
+    """
+    if table == 'measurements':
+        query = session.query(*[getattr(Measurement, col) for col in columns])
+        results = query.all()
+        df = pd.DataFrame(results, columns=columns)
+    else:
+        # For other tables, use raw SQL
+        columns_str = ', '.join(columns)
+        query = f"SELECT {columns_str} FROM {table}"
+        df = pd.read_sql_query(query, engine)
+    
     return df
 
 def load_csv_and_insert(csv_file):
@@ -79,3 +95,12 @@ def load_csv_and_insert(csv_file):
     session.commit()
     print(f"Inserted {len(df)} records into the database.")
 
+def get_substance_library():
+    """
+    Retrieve the substance library with K0 values from the database.
+    """
+    columns = ["id", "substance_name", 
+               "k0_pos_1", "k0_pos_2", "k0_pos_3", 
+               "k0_neg_1", "k0_neg_2", "k0_neg_3"]
+    
+    return select_columns_from_db(columns, table='library')
