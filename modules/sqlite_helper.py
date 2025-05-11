@@ -1,15 +1,13 @@
 import pandas as pd
-from sqlalchemy import create_engine, Column, Integer, String, Float, BLOB
+from sqlalchemy import create_engine, Column, Integer, String, Float, BLOB, Table, MetaData
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
 
-# Define the SQLite database file path
 DB_FILE = './db/ims.db'
 engine = create_engine(f'sqlite:///{DB_FILE}')
 Base = declarative_base()
 
-# Define the Measurement model
 class Measurement(Base):
     __tablename__ = 'measurements'
     
@@ -34,30 +32,39 @@ class Measurement(Base):
     pos_spectrum = Column(BLOB)
     neg_spectrum = Column(BLOB)
 
-# Create the table if it doesn't exist
 Base.metadata.create_all(engine)
 
-# Set up the session
 Session = sessionmaker(bind=engine)
 session = Session()
 
-# Function to select particular columns from the database
-def select_columns_from_db(columns):
-    # Query the database for the specified columns
-    query = session.query(*[getattr(Measurement, col) for col in columns])
-    results = query.all()
+def select_columns_from_db(columns, table='measurements'):
+    """
+    Select columns from the specified table.
     
-    # Convert the results to a DataFrame
-    df = pd.DataFrame(results, columns=columns)
+    Parameters:
+    - columns: List of column names
+    - table: Table name (default: 'measurements')
+    
+    Returns:
+    - DataFrame with selected data
+    """
+    if table == 'measurements':
+        query = session.query(*[getattr(Measurement, col) for col in columns])
+        results = query.all()
+        df = pd.DataFrame(results, columns=columns)
+    else:
+        # For other tables, use raw SQL
+        columns_str = ', '.join(columns)
+        query = f"SELECT {columns_str} FROM {table}"
+        df = pd.read_sql_query(query, engine)
+    
     return df
 
 def load_csv_and_insert(csv_file):
-    # Read CSV with header row
     df = pd.read_csv(csv_file, header=0)
     print("DataFrame head:")
     print(df.head())
     
-    # Iterate over each row and create a Measurement record
     for index, row in df.iterrows():
         try:
             measurement = Measurement(
@@ -88,4 +95,12 @@ def load_csv_and_insert(csv_file):
     session.commit()
     print(f"Inserted {len(df)} records into the database.")
 
+def get_substance_library():
+    """
+    Retrieve the substance library with K0 values from the database.
+    """
+    columns = ["id", "substance_name", 
+               "k0_pos_1", "k0_pos_2", "k0_pos_3", 
+               "k0_neg_1", "k0_neg_2", "k0_neg_3"]
     
+    return select_columns_from_db(columns, table='library')
